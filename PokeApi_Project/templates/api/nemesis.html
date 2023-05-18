@@ -1,0 +1,43 @@
+{% extends 'index.html' %}
+{% block titulo %} 
+    Pokemon nemesis
+{% endblock titulo %} 
+{% block body %} 
+{% if error %}
+    <h2>{{error}}</h2>
+{% else %}
+{% if pokemones %}
+<h2>Listado de pokemones fuertes contra el tipo: {{tipos}}</h2>
+        <table>
+            <thead>
+                <tr>
+
+            <td>Nombre</td>
+            <td>Tipo</td>
+            <td>Naturaleza</td>
+            <td>Peso</td>
+            <td>Ataque</td>
+                </tr>
+
+    </thead>
+    <tbody>
+    {% for pokemon in pokemones %}
+        <tr>
+
+            <td>{{pokemon.nombre}}</td>
+            <td>{{pokemon.tipo}}</td>
+            <td>{{pokemon.naturaleza}}</td>
+            <td>{{pokemon.peso}}</td>
+            <td>{{pokemon.ataque}}</td>
+        </tr>
+    {% endfor %}
+    </tbody>
+        </table>
+        {% else %}
+            <h2>No hay pokemones registrados que sean fuertes contra el tipo: {{tipos}}</h2>
+{% endif %}
+{% endif %}
+{% endblock body %}
+    
+
+ 

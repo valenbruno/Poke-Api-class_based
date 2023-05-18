@@ -1,0 +1,36 @@
+{% extends 'index.html' %}
+
+{% block titulo %}Filtrado{% endblock titulo %}
+
+{% block body %}
+
+{% if pokemones_filtrados %}
+<h1>Listado de pokemones filtrados por {{nombre_campo}}: {{nombre_enlace}}</h1>
+    <table>
+        <thead>
+            <tr>
+                
+                <th>Nombre</th>
+                <th>Tipo</th>
+                <th>Naturaleza</th>
+                <th>Peso</th>
+                <th>Ataque</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for pokemon in pokemones_filtrados %}
+                <tr>
+                    
+                    <td>{{ pokemon.nombre }}</td>
+                    <td>{{ pokemon.tipo }}</td>
+                    <td>{{ pokemon.naturaleza }}</td>
+                    <td>{{ pokemon.peso }}</td>
+                    <td>{{ pokemon.ataque }}</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% else %}
+    <h1>No existen pokemones registrados con la busqueda: {{nombre_campo}}</h1>
+{% endif %}   
+{% endblock body %}

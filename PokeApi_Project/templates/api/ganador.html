@@ -1,0 +1,11 @@
+{% extends 'index.html' %} 
+{% block titulo %} 
+    Eliminacion de Pokemon
+{% endblock titulo %}
+{% block body %}
+{% if ganador %}
+    <h2>{{contendiente}} puede ganarle a {{contrincante}} segun sus debilidades</h2>
+{% else %}
+    <h2>{{contendiente}} no puede ganarle a {{contrincante}} segun sus debilidades</h2>
+{% endif %}
+{% endblock body %}

@@ -1,0 +1,13 @@
+{% extends 'index.html' %} <!-- Tag para heredar una plantilla, en este caso index.html -->
+{% block titulo %} 
+    Confirmacion de eliminacion
+{% endblock titulo %}
+
+{% block body %}
+<form method="post">
+    {% csrf_token %}
+    <p><strong>Esta seguro de eliminar el pokemon {{object}}?</strong> </p> <!-- Aparece el nombre del pokemon por la funcion __str__ en el modelo !-->
+    <button type="submit">Confirmar</button>
+</form>
+
+{% endblock body %}
