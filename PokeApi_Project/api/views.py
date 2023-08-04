@@ -1,112 +1,91 @@
-from django.shortcuts import render,redirect
-from .forms import PokemonForm
 from .models import Pokemon
 from django.db.models import Q # Q object, se utiliza para construir consultas complejas y combinar condiciones en consultas en la DB
-from django.core.exceptions import ObjectDoesNotExist # Excepcion para la view de editar y de enfrentamiento
-from django.views.generic import TemplateView, ListView, UpdateView, CreateView, DeleteView, View
-from django.urls import reverse_lazy
-from django.views.decorators.http import require_GET
-
-
-
+from django.core.exceptions import FieldError
+import json 
+from django.utils.decorators import method_decorator
+from django.views.decorators.csrf import csrf_exempt
+from .serializers import PokemonSerializer
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
+from rest_framework.views import APIView
 
 # Create your views here.
 
 # Camel case para clases y snake case para funciones/variables
 
-class Inicio (TemplateView):
-    template_name = 'index.html'
+class ListAndCreatePokemon(APIView):
 
-class ListAndCreatePokemon(CreateView, ListView):
-    model = Pokemon
-    form_class = PokemonForm
-    context_object_name = 'pokemones'
-    success_url = reverse_lazy('index')
-    template_name = 'api/pokemon_list_and_create.html'
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        
-        # Lista de cada campo sin repetir elementos
-        queryset = Pokemon.objects.values_list('nombre', flat=True)
-        lista_nombre = list(set(queryset))
-        queryset = Pokemon.objects.values_list('tipo', flat=True)
-        lista_tipo = list(set(queryset))
-        queryset = Pokemon.objects.values_list('naturaleza', flat=True)
-        lista_naturaleza = list(set(queryset))
-        queryset = Pokemon.objects.values_list('peso', flat=True)
-        lista_peso = list(set(queryset))
-        queryset = Pokemon.objects.values_list('ataque', flat=True)
-        lista_ataque = list(set(queryset))
-
-        # Agregar variables para el template
-        
-        context['lista_nombre'] = lista_nombre
-        context['lista_tipo'] = lista_tipo
-        context['lista_naturaleza'] = lista_naturaleza
-        context['lista_peso'] = lista_peso
-        context['lista_ataque'] = lista_ataque
-        
-        return context
+    @method_decorator(csrf_exempt)
+    def dispatch(self, request, *args, **kwargs):
+        return super().dispatch(request, *args, **kwargs)
     
-    def filtrado(request, nombre_enlace, nombre_campo):
-        pokemones_filtrados = Pokemon.objects.filter(**{nombre_campo: nombre_enlace})
-        return render(request, 'api/filtrado.html', {'pokemones_filtrados':pokemones_filtrados, 'nombre_enlace':nombre_enlace, 'nombre_campo':nombre_campo})
+    def get_queryset(self, search_query, field):
+        queryset = Pokemon.objects.all()
+        if search_query:
+            if field: 
+                field_filter = f"{field}__icontains" #icontains filtra si contiene el string ingresado dentro del string completo
+                dic_field = {field_filter : search_query}
+                queryset = queryset.filter(**dic_field)
+            else:
+                queryset = queryset.filter(
+                    Q(nombre__icontains=search_query) |
+                    Q(tipo__icontains=search_query) |
+                    Q(naturaleza__icontains=search_query)
+                )
+        return queryset
+    
+    
+    def get(self, request):
+        field = request.GET.get('field')
+        search_query = request.GET.get('search')
+        try:
+            queryset = self.get_queryset(search_query,field)
+            pokemones = list(queryset.values())
+            return Response({'pokemones': pokemones})
+        except FieldError:
+            return Response('El campo ingresado es incorrecto')
 
-
-    def filtrado_busqueda(request):
-        parametro_busqueda = request.GET.get('q', '') # Se obtiene el contenido de la busqueda, q es la key de la barra
-        if (parametro_busqueda):
-            pokemones_filtrados = Pokemon.objects.filter(Q(nombre__icontains=parametro_busqueda) | Q(tipo__icontains=parametro_busqueda) 
-                                                     | Q(naturaleza__icontains=parametro_busqueda))
-            return render(request, 'api/filtrado.html', {'pokemones_filtrados':pokemones_filtrados, 'nombre_campo':parametro_busqueda})
-        else:
-            return redirect('api:create_pokemon')
+    
+    def post(self, request, *args, **kwargs):
+        serializer = PokemonSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+        return Response(serializer.data)
         
     
-# Al ser una clase lo trata todo como un objeto. Con form_class lo renderiza en el template de manera global. Lo renderiza con la palabra "form"
-class EditPokemon(UpdateView): 
-    model = Pokemon
-    form_class = PokemonForm
-    template_name = 'api/edit_pokemon.html'
-    success_url = reverse_lazy('api:create_pokemon') # es como la funcion redirect pero lo hace cuando la accion se termina
 
-class DeletePokemon(DeleteView):
-    model = Pokemon
-    success_url = reverse_lazy('api:create_pokemon')
-    # Necesita un template como ventana de confirmacion. Por defecto busca el template: nombre_modelo_confirm_delete.html
-    # Elimina directamente de la DB
-
-
-class AdittionalPokemonViews(View):
-    debilidades = {
-                'Normal': ['Lucha'],
-                'Fuego': ['Agua', 'Tierra', 'Roca'],
-                'Agua': ['Planta', 'Eléctrico'],
-                'Planta': ['Fuego', 'Hielo', 'Veneno', 'Volador', 'Bicho'],
-                'Eléctrico': ['Tierra'],
-                'Hielo': ['Fuego', 'Lucha', 'Roca', 'Acero'],
-                'Lucha': ['Volador', 'Psíquico', 'Hada'],
-                'Veneno': ['Tierra', 'Psíquico'],
-                'Tierra': ['Agua', 'Planta', 'Hielo'],
-                'Volador': ['Eléctrico', 'Hielo', 'Roca'],
-                'Psíquico': ['Bicho', 'Fantasma', 'Siniestro'],
-                'Bicho': ['Volador', 'Roca', 'Fuego'],
-                'Roca': ['Agua', 'Planta', 'Lucha', 'Tierra', 'Acero'],
-                'Fantasma': ['Fantasma', 'Siniestro'],
-                'Dragón': ['Hielo', 'Dragón', 'Hada'],
-                'Siniestro': ['Lucha', 'Bicho', 'Hada'],
-                'Acero': ['Fuego', 'Lucha', 'Tierra'],
-                'Hada': ['Veneno', 'Acero']
-            } 
-# No puedo acceder al diccionario global mediante self, si lo pongo primero en los argumentos me tira missing 1 required positional argument: 'request'
-# Si lo pongo segundo y primero el request me tira al reves missing 1 required positional argument: 'self'
+class EditPokemon(APIView): 
+    def put(self, request, id):
+        try:
+            pokemon = Pokemon.objects.get(id=id)
+            serializer = PokemonSerializer(instance=pokemon,data=request.data)
+            if serializer.is_valid():
+                serializer.save()
+            return Response(serializer.data)
+        except Pokemon.DoesNotExist:
+            return Response('No se encontro el pokemon con el id asociado', status=404)
+       
+class DeletePokemonAndGetID(APIView):
+    def delete(self,request,id):
+        try:
+            pokemon = Pokemon.objects.get(id=id)
+            pokemon.delete()
+            return Response('Se elimino el pokemon correctamente')
+        except Pokemon.DoesNotExist:
+            return Response('No se encontro el pokemon con el id asociado', status=404)
     
-    @require_GET # Solo accede por solicitud HTTP GET
+    def get(self,request,id):
+        try:
+            pokemon = Pokemon.objects.get(id=id)
+            serializer = PokemonSerializer(pokemon, many=False)
+            return Response(serializer.data)
+        except Pokemon.DoesNotExist:
+            return Response('No se encontro el pokemon con el id asociado', status=404)
+
+class AdittionalPokemonViews(APIView):
+    
+    @api_view(['GET'])
     def nemesis_pokemon(request,id):
-        pokemon_filter = None
-        error = None
-        tipo = None
         debilidades = {
                 'Normal': ['Lucha'],
                 'Fuego': ['Agua', 'Tierra', 'Roca'],
@@ -131,22 +110,29 @@ class AdittionalPokemonViews(View):
             pokemon = Pokemon.objects.get(id = id)
             tipo = pokemon.tipo
             pokemon_filter = Pokemon.objects.filter(tipo__in=debilidades[tipo])
+            pokemon_dict = list(pokemon_filter.values())
+            return Response({'debilidades':pokemon_dict})
         except Exception as e:
             error = e 
-        return render(request, 'api/nemesis.html', {'pokemones':pokemon_filter, 'tipos':tipo, 'error':error})
+            print(error)
+            return Response('No se encontro el Pokemon con el ID especificado', status=404) 
     
     
-
+    @api_view(['GET','DELETE'])
     def remove_pokemon(request):
+    
         tipo_pokemon = request.GET.get('tipo') # Cuando se pasa el parametro ?tipo="tipo" se lo recupera
         pokemon = Pokemon.objects.filter(tipo = tipo_pokemon)
-        if request.method == "POST":
-            pokemon.delete()
-            return redirect('api:create_pokemon')
-        return render(request, 'api/remove_pokemon.html', {'tipo':tipo_pokemon})
-
-    
+        if not pokemon.exists():
+            return Response('No se encontraron pokemones con el tipo especificado', status=404)  
+        pokemon.delete()
+        return Response('Se eliminaron correctamente los pokemones', status=404)
+        
+    @csrf_exempt
+    @api_view(['POST','GET'])
     def enfrentamiento(request):
+        if request.method == 'GET':
+            return Response("Ingrese la informacion en formato json")
         debilidades = {
                 'Normal': ['Lucha'],
                 'Fuego': ['Agua', 'Tierra', 'Roca'],
@@ -167,20 +153,23 @@ class AdittionalPokemonViews(View):
                 'Acero': ['Fuego', 'Lucha', 'Tierra'],
                 'Hada': ['Veneno', 'Acero']
             }
-        ganador = False
-        error = None 
-        if request.method == "POST":
-            form_data = request.POST
-            try:
-                id_contendiente = form_data['pokemon_contendiente']
-                id_contrincante = form_data['pokemon_contrincante']
-                pokemon_contrincante = Pokemon.objects.get(id = id_contrincante)
-                pokemon_contendiente = Pokemon.objects.get(id = id_contendiente)
-                if(pokemon_contendiente.tipo in debilidades.get(pokemon_contrincante.tipo, [])):
-                    ganador = True
-                return render(request, 'api/ganador.html', {'ganador':ganador, 'contrincante':pokemon_contrincante, 'contendiente':pokemon_contendiente})
-            except Exception as e:
-                error = e 
+        try:
+            data = json.loads(request.body)
+            id_contendiente = data.get('pokemon1')
+            id_contrincante = data.get('pokemon2')
+            pokemon_contrincante = Pokemon.objects.get(id = id_contrincante)
+            pokemon_contendiente = Pokemon.objects.get(id = id_contendiente)
+            if(pokemon_contendiente.tipo in debilidades.get(pokemon_contrincante.tipo, [])):
+                return Response('El pokemon puede ganarle a su rival')
+            else:
+                return Response('El pokemon no puede ganarle a su rival')
+        except Pokemon.DoesNotExist:
+            return Response('No existe el pokemon con el ID ingresado', status=404)    
+                
+        except Exception as e:
+            error = e
+            print(error) 
+            return Response('Ocurrio un error')
         
-        return render(request,'api/enfrentamiento.html', {'ganador':ganador, 'error':error})
+
 
